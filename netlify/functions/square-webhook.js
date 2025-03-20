@@ -13,36 +13,44 @@ export async function handler(event) {
   try {
     const body = JSON.parse(event.body);
 
-    // Square Event Type (Check if it's a successful payment)
-    if (body.type === 'payment.created') {
-      const payment = body.data.object.payment;
-      const amount = payment.total_money.amount / 100; // Convert from cents to dollars
-      const note = payment.note || ''; // Capture any notes
+    // Log the webhook event for debugging
+    console.log('Received Webhook:', JSON.stringify(body, null, 2));
 
-      // Identify Membership Type by amount or note
-      if (amount === 100 || note.includes('Pay in Full Membership')) {
-        await updateMemberCount();
-      } else if (amount === 27.50 || note.includes('Payment Plan Membership')) {
-        await updateMemberCount();
-      } else if (amount === 100 || note.includes('Sponsor a Membership')) {
-        await updateMemberCount();
-      }
+    // Ensure this is a payment event
+    if (body.type !== 'payment.created') {
+      console.log('Ignoring non-payment event.');
+      return { statusCode: 200, body: 'Event ignored' };
     }
 
-    return { statusCode: 200, body: 'Webhook processed' };
-  } catch (error) {
-    console.error('Webhook error:', error);
-    return { statusCode: 500, body: 'Internal Server Error' };
-  }
-}
+    // Extract payment details
+    const payment = body.data.object;
+    const amount = payment.amount_money?.amount || 0; // Amount in cents
+    const note = payment.note || ''; // Optional description
 
-// Function to update member count in Supabase
-async function updateMemberCount() {
-  const { data, error } = await supabase.rpc('increment_member_count');
+    // Check if this is a membership purchase
+    const isMembership = note.includes('Membership');
 
-  if (error) {
-    console.error('Supabase update error:', error);
-  } else {
-    console.log('Member count updated:', data);
+    if (!isMembership) {
+      console.log('Ignoring non-membership payment.');
+      return { statusCode: 200, body: 'Non-membership payment ignored' };
+    }
+
+    // Increment member count in Supabase
+    const { error } = await supabase
+      .from('settings')
+      .update({ member_count: supabase.raw('member_count + 1') })
+      .eq('id', 1);
+
+    if (error) {
+      console.error('Database update failed:', error);
+      return { statusCode: 500, body: 'Database update failed' };
+    }
+
+    console.log('Member count updated successfully!');
+    return { statusCode: 200, body: 'Member count updated' };
+
+  } catch (err) {
+    console.error('Webhook processing error:', err);
+    return { statusCode: 500, body: 'Webhook processing error' };
   }
 }
