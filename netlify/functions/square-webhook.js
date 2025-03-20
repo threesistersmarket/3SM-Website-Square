@@ -23,30 +23,25 @@ export async function handler(event) {
     }
 
     // Extract payment details
-    const payment = body.data.object;
-    const amount = payment.amount_money?.amount || 0; // Amount in cents
-    const note = payment.note || ''; // Optional description
+    const payment = body.data.object.payment;
+    const amount = payment.total_money?.amount || 0; // Total amount in cents
+    const note = (payment.note || '').toLowerCase(); // Normalize for case-insensitive matching
 
     // Check if this is a membership purchase
-    const isMembership = note.includes('Membership');
-
-    if (!isMembership) {
+    if (!note.includes('membership')) {
       console.log('Ignoring non-membership payment.');
       return { statusCode: 200, body: 'Non-membership payment ignored' };
     }
 
-    // Increment member count in Supabase
-    const { error } = await supabase
-      .from('settings')
-      .update({ member_count: supabase.raw('member_count + 1') })
-      .eq('id', 1);
+    // Increment member count using Supabase RPC
+    const { error } = await supabase.rpc('increment_member_count');
 
     if (error) {
       console.error('Database update failed:', error);
       return { statusCode: 500, body: 'Database update failed' };
     }
 
-    console.log('Member count updated successfully!');
+    console.log('✅ Member count updated successfully!');
     return { statusCode: 200, body: 'Member count updated' };
 
   } catch (err) {
