@@ -49,10 +49,12 @@ export async function handler(event) {
     }
 
     // Update member count
-    const { error } = await supabase
-      .from('settings')
-      .update({ member_count: supabase.raw('member_count + 1') })
-      .eq('id', 1);
+    const { error } = await supabase.rpc('increment_member_count');
+
+    if (error) {
+      console.error('Database update failed:', error);
+      return { statusCode: 500, body: 'Database update failed' };
+    }
 
     if (error) {
       console.error('Database update failed:', error);
