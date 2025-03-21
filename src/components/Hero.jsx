@@ -17,19 +17,25 @@ function Hero() {
   const [scrollPosition, setScrollPosition] = useState(0);
 
 
-  useEffect(() => {
-    const fetchMemberCount = async () => {
-      try {
-        const { data, error } = await supabase.from('settings').select('member_count').single();
-        if (error) throw error;
-        animateCount(data?.member_count || 0);
-      } catch (err) {
-        console.error('Failed to fetch member count:', err);
-      }
-    };
+ useEffect(() => {
+  const fetchMemberCount = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("settings")
+        .select("member_count")
+        .single();
+      if (error) throw error;
 
-    fetchMemberCount();
-  }, []);
+      // Round down to nearest whole number before displaying
+      animateCount(Math.floor(data?.member_count || 0));
+    } catch (err) {
+      console.error("Failed to fetch member count:", err);
+    }
+  };
+
+  fetchMemberCount();
+}, []);
+
 
   const animateCount = (targetCount) => {
     const duration = 2000;
