@@ -58,7 +58,7 @@ export async function handler(event) {
 
 // Function to fetch order details
 async function fetchOrderDetails(orderId) {
-  const response = await fetch(`https://connect.squareupsandbox.com/v2/orders/${orderId}`, {
+  const response = await fetch(`https://connect.squareup.com/v2/orders/${orderId}`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${SQUARE_ACCESS_TOKEN}`,
