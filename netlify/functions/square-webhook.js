@@ -101,22 +101,23 @@ function getMembershipType(order) {
 }
 
 // Function to check if customer has previous payments
-async function checkCustomerPaymentHistory(customerId) {
-  if (!customerId) return false;
+async function checkCustomerPaymentHistory(supabase, customerName) {
+  try {
+    const { data, error } = await supabase
+      .from('payments')
+      .select('customer_name')
+      .eq('customer_name', customerName);
 
-  const response = await fetch(`https://connect.squareupsandbox.com/v2/payments?customer_id=${customerId}`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${SQUARE_ACCESS_TOKEN}`,
-      'Content-Type': 'application/json',
-    },
-  });
+    if (error) {
+      console.error('Supabase query error:', error);
+      return false;
+    }
 
-  if (!response.ok) {
-    console.error('Failed to fetch payment history:', await response.text());
+    console.log('Supabase query result:', data); // Debugging log
+
+    return (data ?? []).some((entry) => entry.customer_name === customerName);
+  } catch (err) {
+    console.error('Error checking customer payment history:', err);
     return false;
   }
-
-  const data = await response.json();
-  return data.payments.some(payment => payment.amount_money.amount === 2750); // 27.50 in cents
 }
