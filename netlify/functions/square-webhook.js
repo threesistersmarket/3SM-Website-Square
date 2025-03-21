@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
@@ -8,116 +8,76 @@ const supabase = createClient(
 const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN;
 
 export async function handler(event) {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+  if (event.httpMethod !== "POST") {
+    return { statusCode: 405, body: "Method Not Allowed" };
   }
 
   try {
     const body = JSON.parse(event.body);
-    console.log('Received Webhook:', JSON.stringify(body, null, 2));
+    console.log("Received Webhook:", JSON.stringify(body, null, 2));
 
-    if (body.type !== 'order.created') {
-      return { statusCode: 200, body: 'Event ignored' };
+    if (body.type !== "order.created") {
+      return { statusCode: 200, body: "Event ignored" };
     }
 
     const order = body.data.object.order_created;
     const orderId = order.order_id;
-    const locationId = order.location_id;
 
-    // Fetch order details using fetch (no node-fetch needed)
-    const orderDetails = await fetchOrderDetails(orderId, locationId);
+    // Fetch order details
+    const orderDetails = await fetchOrderDetails(orderId);
     if (!orderDetails) {
-      return { statusCode: 500, body: 'Failed to fetch order details' };
+      return { statusCode: 500, body: "Failed to fetch order details" };
     }
 
-    // Extract customer ID and membership type
-    const customerId = orderDetails.customer_id;
-    const membershipType = getMembershipType(orderDetails);
-
-    if (!membershipType) {
-      return { statusCode: 200, body: 'No valid membership found' };
-    }
-
-    // Special check for Payment Plan Membership
-    if (membershipType === 'Payment Plan Membership') {
-      const hasPreviousPayments = await checkCustomerPaymentHistory(customerId);
-
-      if (hasPreviousPayments) {
-        console.log('Customer has already made a Payment Plan Membership payment.');
-        return { statusCode: 200, body: 'Duplicate payment ignored' };
+    // Calculate member count increment
+    let incrementValue = 0;
+    for (let item of orderDetails.line_items || []) {
+      if (item.name.includes("Payment Plan Membership")) {
+        incrementValue += 0.25;
+      } else if (
+        item.name.includes("Pay in Full Membership") ||
+        item.name.includes("Sponsor a Membership")
+      ) {
+        incrementValue += 1;
       }
     }
 
-    // Update member count
-    const { error } = await supabase.rpc('increment_member_count');
+    // If there's an increment to apply, update the settings table
+    if (incrementValue > 0) {
+      const { error } = await supabase
+        .from("settings")
+        .update({ member_count: supabase.raw("member_count + ?", [incrementValue]) })
+        .eq("id", 1);
 
-    if (error) {
-      console.error('Database update failed:', error);
-      return { statusCode: 500, body: 'Database update failed' };
+      if (error) {
+        console.error("Database update failed:", error);
+        return { statusCode: 500, body: "Database update failed" };
+      }
     }
 
-    if (error) {
-      console.error('Database update failed:', error);
-      return { statusCode: 500, body: 'Database update failed' };
-    }
-
-    console.log('Member count updated successfully!');
-    return { statusCode: 200, body: 'Member count updated' };
-
+    console.log("Member count updated successfully!");
+    return { statusCode: 200, body: "Member count updated" };
   } catch (err) {
-    console.error('Webhook processing error:', err);
-    return { statusCode: 500, body: 'Webhook processing error' };
+    console.error("Webhook processing error:", err);
+    return { statusCode: 500, body: "Webhook processing error" };
   }
 }
 
-// Function to fetch order details (without node-fetch)
-async function fetchOrderDetails(orderId, locationId) {
-  const response = await fetch(`https://connect.squareupsandbox.com/v2/orders/${orderId}`, {
-    method: 'GET',
+// Fetch Square order details
+async function fetchOrderDetails(orderId) {
+  const response = await fetch(`https://connect.squareup.com/v2/orders/${orderId}`, {
+    method: "GET",
     headers: {
-      'Authorization': `Bearer ${SQUARE_ACCESS_TOKEN}`,
-      'Content-Type': 'application/json',
+      Authorization: `Bearer ${SQUARE_ACCESS_TOKEN}`,
+      "Content-Type": "application/json",
     },
   });
 
   if (!response.ok) {
-    console.error('Failed to fetch order details:', await response.text());
+    console.error("Failed to fetch order details:", await response.text());
     return null;
   }
 
   const data = await response.json();
   return data.order;
-}
-
-// Function to determine membership type based on order items
-function getMembershipType(order) {
-  const items = order.line_items || [];
-  for (let item of items) {
-    if (item.name.includes('Pay in Full Membership')) return 'Pay in Full Membership';
-    if (item.name.includes('Sponsor a Membership')) return 'Sponsor a Membership';
-    if (item.name.includes('Payment Plan Membership')) return 'Payment Plan Membership';
-  }
-  return null;
-}
-
-// Function to check if customer has previous payments
-async function checkCustomerPaymentHistory(supabase, customerName) {
-  try {
-    const { data, error } = await supabase
-      .from('payments')
-      .select('customer_name')
-      .eq('customer_name', customerName);
-
-    if (error) {
-      console.error('Supabase query error:', error);
-      return false;
-    }
-
-    console.log('Supabase query result:', data); // Debugging log
-
-    return (data ?? []).some((entry) => entry.customer_name === customerName);
-  } catch (err) {
-    console.error('Error checking customer payment history:', err);
-    return false;
-  }
 }
