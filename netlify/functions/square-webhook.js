@@ -70,7 +70,7 @@ export async function handler(event) {
 
 // Function to fetch order details (without node-fetch)
 async function fetchOrderDetails(orderId, locationId) {
-  const response = await fetch(`https://connect.squareup.com/v2/orders/${orderId}`, {
+  const response = await fetch(`https://connect.squareupsandbox.com/v2/orders/${orderId}`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${SQUARE_ACCESS_TOKEN}`,
@@ -102,7 +102,7 @@ function getMembershipType(order) {
 async function checkCustomerPaymentHistory(customerId) {
   if (!customerId) return false;
 
-  const response = await fetch(`https://connect.squareup.com/v2/payments?customer_id=${customerId}`, {
+  const response = await fetch(`https://connect.squareupsandbox.com/v2/payments?customer_id=${customerId}`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${SQUARE_ACCESS_TOKEN}`,
