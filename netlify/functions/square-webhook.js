@@ -1,12 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
-import fetch from 'node-fetch';
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
   process.env.VITE_SUPABASE_ANON_KEY
 );
 
-const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN; // Add this to your Netlify environment variables
+const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN;
 
 export async function handler(event) {
   if (event.httpMethod !== 'POST') {
@@ -25,7 +24,7 @@ export async function handler(event) {
     const orderId = order.order_id;
     const locationId = order.location_id;
 
-    // Fetch order details to get line items
+    // Fetch order details using fetch (no node-fetch needed)
     const orderDetails = await fetchOrderDetails(orderId, locationId);
     if (!orderDetails) {
       return { statusCode: 500, body: 'Failed to fetch order details' };
@@ -69,7 +68,7 @@ export async function handler(event) {
   }
 }
 
-// Function to fetch order details
+// Function to fetch order details (without node-fetch)
 async function fetchOrderDetails(orderId, locationId) {
   const response = await fetch(`https://connect.squareup.com/v2/orders/${orderId}`, {
     method: 'GET',
